@@ -172,25 +172,7 @@ long int bin_packing(int *particle_info, int index)
 			
 		}	
 		core_time_power_info[i].no_of_instans = current_index;
-		//printf("%d\n", core_time_power_info[i].no_of_instans);	
-	
-		
-		fscanf(read_power_value,"%[^\n]\n", arr1);	
-		k = 0 ;
-		//int temp_value;
-		current_index = 0;
-		for( ; k < strlen(arr1) ; )
-		{
-			int j = 0 ;
-			while( arr1[ k ] != '\t' )
-			{
-				dumm[ j ] = arr1[ k ] ;
-				k ++ ;
-				j ++ ;
-			}
-			dumm[ j ] = '\0' ;
-			temp_value = atoi(dumm);
-			core_time_power_info[i].power_instant[current_index ] = temp_value;
+		//printf("%d\n", core_time_power_info[i].power_instant[current_index ] = temp_value;
 			k ++ ;	
 			current_index ++;
 			
