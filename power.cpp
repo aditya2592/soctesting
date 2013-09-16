@@ -834,7 +834,7 @@ int main ()
 				}
 			}
 			
-			//print_power_all(tsched_max);
+			print_power_all(tsched_max);
 			//Find the core, tam pair satisfying the condition of minimum gap between max time tam edge and that tam+core
 			int tmin = 1000000; int min_core; int min_tam;	
 			for(int n=0; n<MAX_CORES; n++)
