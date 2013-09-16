@@ -39,11 +39,11 @@ bool PRINT_PARTITIONS = 1;
 #define MAX_NO_OF_INTERVAL 500000 
 typedef struct {
 	long int time_instant[MAX_NO_OF_INTERVAL];
-	double power_instant[MAX_NO_OF_INTERVAL];
+	int power_instant[MAX_NO_OF_INTERVAL];
 	long int no_of_instants;
 }core_time_power;
 core_time_power core_time_power_info;
-double POWER_MAX;
+int POWER_MAX;
 
 
 bool compare_by_word(const string& lhs, const string& rhs) {
@@ -489,34 +489,192 @@ bool check_all_cores_assgn(core cores[])
 	}
 	return 1;
 }
-void update_power_info(int start_time, int end_time)
+void update_power_info(int core, int tamw, int start_time, int end_time, bool test)
 {
-	for(int i=start_time; i<=end_time; i++)
+	string corenum;          // string which will contain the result
+	ostringstream convert;   // stream used for the conversion
+	convert << core;      // insert the textual representation of 'Number' in the characters in the stream
+	corenum = convert.str(); // set 'Result' to the contents of the stream
+	
+	string tamwd;          // string which will contain the result
+	ostringstream convert2;   // stream used for the conversion
+	convert2 << tamw;      // insert the textual representation of 'Number' in the characters in the stream
+	tamwd = convert2.str(); // set 'Result' to the contents of the stream
+
+	string file = powerdir+string("/cycle_wise_power_value/")+string("cycle_accurate_power_module_no_")+string(corenum)+string("tam_width_")+string(tamwd)+string(".txt");
+	//printf("Reading power data from %s \n", file.c_str());
+	ifstream fin;
+	int line_count = 0;
+	fin.open(file.c_str());
+	if (!fin.good()) 
 	{
-		//core_time_power_info.power_instant[i] = core_time_power_info.power_instant[i] + power; 
-	}	
-	core_time_power_info.no_of_instants = end_time;
+		cout<<"Error opening file "<<file.c_str()<<"\n";
+	}
+	while (!fin.eof())
+	{
+		char buf[MAX_CHARS_PER_LINE];
+		fin.getline(buf, MAX_CHARS_PER_LINE);	//Reading entire line into buffer
+		int n = 0; 
+		const char* token[MAX_TOKENS_PER_LINE] = {}; 
+		line_count++;
+		if(line_count==1)
+		{
+			continue;
+		}
+
+
+		//Reading the first value of the line into array   
+		for(int i = 0; i<MAX_SPACE_DELIM ;i++)
+		{
+			token[n] = strtok(buf, DELIMITER); 
+			if(token[n])
+			{
+				break;
+			}
+		}
+		//Reading rest of the words in the line separated by spaces into the array
+		if (token[0])
+		{
+			for (n = 1; n < MAX_TOKENS_PER_LINE; n++)
+			{
+				for(int i = 0; i<10;i++)
+				{
+					token[n] = strtok(0, DELIMITER); 
+					if(token[n])
+					{
+						break;
+					}
+				}
+			}
+		}
+		//Converting token values read from file to integers
+		stringstream strvalue;
+		strvalue << token[0];
+		int intvalue;
+		strvalue >> intvalue;  //clock cycle
+
+
+		stringstream strvalue2;
+		strvalue2 << token[1];
+
+		int intvalue2;
+		strvalue2 >> intvalue2;  //power value of this cycle
+		if(start_time+intvalue<end_time)
+		{
+			core_time_power_info.power_instant[start_time+intvalue] = core_time_power_info.power_instant[start_time+intvalue] + intvalue2;     
+		}
+		//Test token values read from file    
+		for (int i = 0; i < n; i++)
+		{ 
+			//cout << "token[" << i << "] = " << token[i] ;
+		}
+
+		//cout << endl;
+
+	}
+	//printf("Power consumed %d\n", power_area);
 }
-void print_power_all()
+void print_power_all(int tsched_max)
 {
 
-	for(int i=0; i<=core_time_power_info.no_of_instants; i++)
+	for(int i=0; i<=tsched_max; i++)
 	{
-		//printf("%d : %d ",i, core_time_power_info.power_instant[i]);		
+		if(core_time_power_info.power_instant[i])
+		{
+			printf("%d : %d ",i, core_time_power_info.power_instant[i]);
+		}		
 	}	
 	cout<<"\n";
 
 }
-bool check_power_constraint(int start_time, int end_time)
+bool check_power_constraint(int core, int tamw, int start_time, int end_time, bool test)
 {
+	string corenum;          // string which will contain the result
+	ostringstream convert;   // stream used for the conversion
+	convert << core;      // insert the textual representation of 'Number' in the characters in the stream
+	corenum = convert.str(); // set 'Result' to the contents of the stream
 	
-	for(int i=start_time; i<=end_time; i++)
+	string tamwd;          // string which will contain the result
+	ostringstream convert2;   // stream used for the conversion
+	convert2 << tamw;      // insert the textual representation of 'Number' in the characters in the stream
+	tamwd = convert2.str(); // set 'Result' to the contents of the stream
+
+	string file = powerdir+string("/cycle_wise_power_value/")+string("cycle_accurate_power_module_no_")+string(corenum)+string("tam_width_")+string(tamwd)+string(".txt");
+	//printf("Reading power data from %s \n", file.c_str());
+	ifstream fin;
+	int line_count = 0;
+	fin.open(file.c_str());
+	if (!fin.good()) 
 	{
-		//if(core_time_power_info.power_instant[i] + power > POWER_MAX) 
+		cout<<"Error opening file "<<file.c_str()<<"\n";
+	}
+	while (!fin.eof())
+	{
+		char buf[MAX_CHARS_PER_LINE];
+		fin.getline(buf, MAX_CHARS_PER_LINE);	//Reading entire line into buffer
+		int n = 0; 
+		const char* token[MAX_TOKENS_PER_LINE] = {}; 
+		line_count++;
+		if(line_count==1)
 		{
-		//	return 0;
+			continue;
 		}
-	}	
+
+
+		//Reading the first value of the line into array   
+		for(int i = 0; i<MAX_SPACE_DELIM ;i++)
+		{
+			token[n] = strtok(buf, DELIMITER); 
+			if(token[n])
+			{
+				break;
+			}
+		}
+		//Reading rest of the words in the line separated by spaces into the array
+		if (token[0])
+		{
+			for (n = 1; n < MAX_TOKENS_PER_LINE; n++)
+			{
+				for(int i = 0; i<10;i++)
+				{
+					token[n] = strtok(0, DELIMITER); 
+					if(token[n])
+					{
+						break;
+					}
+				}
+			}
+		}
+		//Converting token values read from file to integers
+		stringstream strvalue;
+		strvalue << token[0];
+		int intvalue;
+		strvalue >> intvalue;  //clock cycle
+
+
+		stringstream strvalue2;
+		strvalue2 << token[1];
+
+		int intvalue2;
+		strvalue2 >> intvalue2;  //power value of this cycle
+		if(test && start_time+intvalue<end_time)
+		{
+			if(core_time_power_info.power_instant[start_time+intvalue] + intvalue2 > POWER_MAX)
+			{
+				return 0;
+			}
+		}
+
+		//Test token values read from file    
+		for (int i = 0; i < n; i++)
+		{ 
+			//cout << "token[" << i << "] = " << token[i] ;
+		}
+
+		//cout << endl;
+
+	}
+
 	return 1;
 }
 int main ()
@@ -675,7 +833,8 @@ int main ()
 					//tmax = n;
 				}
 			}
-
+			
+			//print_power_all(tsched_max);
 			//Find the core, tam pair satisfying the condition of minimum gap between max time tam edge and that tam+core
 			int tmin = 1000000; int min_core; int min_tam;	
 			for(int n=0; n<MAX_CORES; n++)
@@ -689,12 +848,15 @@ int main ()
 						for(int m=1; m<=MAX_TAM_NUMBER_IP;m++)
 						{
 								int temp = tsched_max-tams_now[m-1].get_time()-testtimes_now[n][m-1].get_time();
+								bool pow_cond = 1;
+								//pow_cond = check_power_constraint(n+1, tams_now[m-1].get_width(),tams_now[m-1].get_time(), tams_now[m-1].get_time()+testtimes_now[n][m-1].get_time(),1);
 								if(PRINT_PARTITIONS && PRINT_PARTITION_DETAILS)
 								{
-									cout<<temp<<" ";
+									if(!pow_cond)
+										cout<<temp<<"(p) ";
+									else
+										cout<<temp<<" ";
 								}
-								bool pow_cond = check_power_constraint(tams_now[m-1].get_time(), tams_now[m-1].get_time()+testtimes_now[n][m-1].get_time());
-								pow_cond = 1;
 								if(temp<tmin && pow_cond && temp>0)
 								{
 									tmin = temp;
@@ -702,9 +864,10 @@ int main ()
 									min_tam = m-1;
 								}
 
-								if(pow_cond)
+								if(!pow_cond)
 								{
-								//	cout<<n<<m-1<<"\n";
+									//Print cores and tams that violate the power max condition
+									//cout<<"core:"<<n<<" "<<m-1<<"\n";
 								}
 						}	
 		
@@ -733,21 +896,24 @@ int main ()
 
 								int temp = tams_now[m-1].get_time()+testtimes_now[n][m-1].get_time()-tsched_max;
 
+								bool pow_cond = 1;
+								//pow_cond = check_power_constraint(n+1, tams_now[m-1].get_width(),tams_now[m-1].get_time(), tams_now[m-1].get_time()+testtimes_now[n][m-1].get_time(),1);
 								if(PRINT_PARTITIONS && PRINT_PARTITION_DETAILS)
 								{
-									cout<<temp<<" ";
+									if(!pow_cond)
+										cout<<temp<<"(p) ";
+									else
+										cout<<temp<<" ";
 								}
-								bool pow_cond = check_power_constraint(tams_now[m-1].get_time(), tams_now[m-1].get_time()+testtimes_now[n][m-1].get_time());
-								pow_cond = 1;
 								if(temp<tmin && pow_cond)
 								{
 									tmin = temp;
 									min_tam = m-1;
 								}
 
-								if(pow_cond)
+								if(!pow_cond)
 								{
-									//cout<<n<<m-1<<"\n";
+									//cout<<"core:"<<n<<" "<<m-1<<"\n";
 								}
 							}
 
@@ -761,7 +927,8 @@ int main ()
 
 				//cout<<min_core.get_id();   //Checking the min gap core
 				//cout<<min_tam.get_tam_id();  //Checking the min gap tam corresponsing to min core above
-				
+				if(PRINT_PARTITIONS && PRINT_PARTITION_DETAILS)
+					cout<<"Selected tam:"<<min_tam<<"\n";
 				//Valid tam found according to given condition. Checking for core with maximum power area for given tam
 				int max_power = 0;
 				int min_core_new; 
@@ -782,10 +949,13 @@ int main ()
 					}
 					
 				}
+
+				if(PRINT_PARTITIONS && PRINT_PARTITION_DETAILS)
+					cout<<"Selected core with max power area:"<<min_core_new<<"\n";
 				
 				//Core with max power consumed under selected tam has been found. Assign the core to the tam
 				int temp = testtimes_now[min_core_new][min_tam].get_time();
-				update_power_info(tams_now[min_tam].get_time(), tams_now[min_tam].get_time()+temp); //Update the power versus time values	
+				update_power_info(min_core_new+1, tams_now[min_tam].get_width(),tams_now[min_tam].get_time(), tams_now[min_tam].get_time()+temp,0); //Update the power versus time values	
 				tams_now[min_tam].put_core(temp, min_core_new);	//Update the test time on tam
 				cores_now[min_core_new].update_assg(tams_now[min_tam]);	//Update tam assignment for core
 
@@ -794,8 +964,11 @@ int main ()
 			else
 			{
 				//Valid core, tam pair found. Make core assignment to tam
+
+				if(PRINT_PARTITIONS && PRINT_PARTITION_DETAILS)
+					cout<<"Selected tam:"<<min_tam<<"and core:"<<min_core<<"\n";
 				int temp = testtimes_now[min_core][min_tam].get_time();
-				update_power_info(tams_now[min_tam].get_time(), tams_now[min_tam].get_time()+temp); //Update the power versus time values	
+				update_power_info(min_core+1, tams_now[min_tam].get_width(),tams_now[min_tam].get_time(), tams_now[min_tam].get_time()+temp,0); //Update the power versus time values	
 				tams_now[min_tam].put_core(temp, min_core);
 				cores_now[min_core].update_assg(tams_now[min_tam]);
 					
@@ -817,7 +990,6 @@ int main ()
 					printf("        Time : %d\n", tams_now[i].get_time());
 			}
 			cout<<"\n";
-			//print_power_all();
 		}
 		exit(0);
 
