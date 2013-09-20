@@ -65,6 +65,10 @@ class core
 	int is_assg;
 	tam mytam;
 	public:
+	core()
+	{
+		is_assg = 0;
+	}
 	void store_id(int id)
 	{
 		coreid = id;
