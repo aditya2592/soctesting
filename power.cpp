@@ -33,7 +33,7 @@ int flag = 0;
 
 bool PRINT_COREASSG  = 0;
 bool PRINT_FINAL_COREASSG = 1;
-bool PRINT_PARTITION_DETAILS= 0;
+bool PRINT_PARTITION_DETAILS= 1;
 bool PRINT_PARTITIONS = 1;
 
 #define MAX_NO_OF_INTERVAL 500000 
@@ -489,7 +489,7 @@ bool check_all_cores_assgn(core cores[])
 	}
 	return 1;
 }
-void update_power_info(int core, int tamw, int start_time, int end_time, bool test)
+void update_power_info(int core, int tamw, int start_time, int end_time)
 {
 	string corenum;          // string which will contain the result
 	ostringstream convert;   // stream used for the conversion
@@ -500,7 +500,6 @@ void update_power_info(int core, int tamw, int start_time, int end_time, bool te
 	ostringstream convert2;   // stream used for the conversion
 	convert2 << tamw;      // insert the textual representation of 'Number' in the characters in the stream
 	tamwd = convert2.str(); // set 'Result' to the contents of the stream
-
 	string file = powerdir+string("/cycle_wise_power_value/")+string("cycle_accurate_power_module_no_")+string(corenum)+string("tam_width_")+string(tamwd)+string(".txt");
 	//printf("Reading power data from %s \n", file.c_str());
 	ifstream fin;
@@ -559,10 +558,15 @@ void update_power_info(int core, int tamw, int start_time, int end_time, bool te
 
 		int intvalue2;
 		strvalue2 >> intvalue2;  //power value of this cycle
-		if(start_time+intvalue<end_time)
+		if(start_time+intvalue<=end_time)
 		{
 			core_time_power_info.power_instant[start_time+intvalue] = core_time_power_info.power_instant[start_time+intvalue] + intvalue2;     
 		}
+		if(core_time_power_info.no_of_instants<end_time)
+		{
+			core_time_power_info.no_of_instants = end_time;     
+		}
+		
 		//Test token values read from file    
 		for (int i = 0; i < n; i++)
 		{ 
@@ -574,14 +578,14 @@ void update_power_info(int core, int tamw, int start_time, int end_time, bool te
 	}
 	//printf("Power consumed %d\n", power_area);
 }
-void print_power_all(int tsched_max)
+void print_power_all()
 {
 
-	for(int i=0; i<=tsched_max; i++)
+	for(int i=0; i<=core_time_power_info.no_of_instants; i++)
 	{
 		if(core_time_power_info.power_instant[i])
 		{
-			printf("%d : %d ",i, core_time_power_info.power_instant[i]);
+			printf("%d : %d\n",i, core_time_power_info.power_instant[i]);
 		}		
 	}	
 	cout<<"\n";
@@ -657,10 +661,11 @@ bool check_power_constraint(int core, int tamw, int start_time, int end_time, bo
 
 		int intvalue2;
 		strvalue2 >> intvalue2;  //power value of this cycle
-		if(test && start_time+intvalue<end_time)
+		if(test && start_time+intvalue<=end_time)
 		{
 			if(core_time_power_info.power_instant[start_time+intvalue] + intvalue2 > POWER_MAX)
 			{
+				//cout<<"|"<<core_time_power_info.power_instant[start_time+intvalue] + intvalue2<<"|";
 				return 0;
 			}
 		}
@@ -676,6 +681,209 @@ bool check_power_constraint(int core, int tamw, int start_time, int end_time, bo
 	}
 
 	return 1;
+}
+int power_assign(core cores_now[], tam tams_now[], times testtimes_now[][MAX_TAM_NUMBER], int lc)
+{
+		int PRINT_PARTITION_DETAILS= 0;
+		int PRINT_PARTITIONS = 0;
+		int PRINT_POWER_DETAIL = 0;
+		int PRINT_TAM_ASSGNS = 0;
+		int tsched_max = 0;//int tmax;
+		while(!check_all_cores_assgn(cores_now))
+		{	
+			//tams_now[1].update_time(100);
+
+			//Finding the tam with maximum scheduled time
+			for(int n=0; n<MAX_TAM_NUMBER_IP; n++)
+			{
+				int time = tams_now[n].get_time();
+				if(time>tsched_max)
+				{
+					tsched_max = time;
+					//tmax = n;
+				}
+			}
+			
+			
+			//Find the core, tam pair satisfying the condition of minimum gap between max time tam edge and that tam+core
+			int tmin = 1000000; int min_core; int min_tam;	
+			for(int n=0; n<MAX_CORES; n++)
+				{
+					if(!cores_now[n].is_assgn())
+					{
+						if(PRINT_PARTITIONS && PRINT_PARTITION_DETAILS)
+						{
+							cout<<"Core "<<n<<" ";
+						}
+						for(int m=1; m<=lc;m++)
+						{
+								int temp = tsched_max-tams_now[m-1].get_time()-testtimes_now[n][m-1].get_time();
+								bool pow_cond = 1;
+								pow_cond = check_power_constraint(n+1, tams_now[m-1].get_width(),tams_now[m-1].get_time(), tams_now[m-1].get_time()+testtimes_now[n][m-1].get_time(),1);
+								if(PRINT_PARTITIONS && PRINT_PARTITION_DETAILS)
+								{
+									if(!pow_cond)
+										cout<<temp<<"(p) ";
+									else
+										cout<<temp<<" ";
+								}
+								if(temp<tmin && temp>0 && pow_cond!=0)
+								{
+									tmin = temp;
+									min_core = n;
+									min_tam = m-1;
+								}
+
+						}	
+		
+						if(PRINT_PARTITIONS && PRINT_PARTITION_DETAILS)
+						{
+							cout<<"\n";
+						}
+					}
+				}
+			if(tmin == 1000000)
+			{
+				//No such pair condition. Reverse minimum gap to find the right tam
+				if(PRINT_PARTITIONS && PRINT_PARTITION_DETAILS)
+					cout<<"Condition one not satisfied\n";
+				tmin = 1000000;
+				int min_tam;
+				for(int n=0; n<MAX_CORES; n++)
+					{
+						if(!cores_now[n].is_assgn())
+						{
+							if(PRINT_PARTITIONS && PRINT_PARTITION_DETAILS)
+							{
+								cout<<"Core "<<n<<" ";
+							}
+							for(int m=1; m<=lc;m++)
+							{
+
+								int temp = tams_now[m-1].get_time()+testtimes_now[n][m-1].get_time()-tsched_max;
+
+								bool pow_cond = 1;
+								pow_cond = check_power_constraint(n+1, tams_now[m-1].get_width(),tams_now[m-1].get_time(), tams_now[m-1].get_time()+testtimes_now[n][m-1].get_time(),1);
+								if(PRINT_PARTITIONS && PRINT_PARTITION_DETAILS)
+								{
+									if(!pow_cond)
+										cout<<temp<<"(p) ";
+									else
+										cout<<temp<<" ";
+								}
+								if(temp<tmin && pow_cond!=0)
+								{
+									tmin = temp;
+									min_tam = m-1;
+								}
+							}
+
+							if(PRINT_PARTITIONS && PRINT_PARTITION_DETAILS)
+							{
+								cout<<"\n";
+							}
+						}
+					}
+		
+
+				//cout<<min_core.get_id();   //Checking the min gap core
+				//cout<<min_tam.get_tam_id();  //Checking the min gap tam corresponsing to min core above
+				if(PRINT_PARTITIONS && PRINT_PARTITION_DETAILS)
+					cout<<"Selected tam:"<<min_tam<<"\n";
+				//Valid tam found according to given condition. Checking for core with maximum power area for given tam
+				int max_power = 0;
+				int min_core_new; 
+				for(int n=0; n<MAX_CORES; n++)
+				{
+					if(!cores_now[n].is_assgn())
+					{
+						int temp = get_power_consumed(n+1,tams_now[min_tam].get_width(),testtimes_now[n][min_tam].get_time(),powerdir);
+						if(PRINT_POWER_DETAIL)
+						{
+							printf("Power for core %d and tam width %d till %d:%d\n", n, tams_now[min_tam].get_width(), testtimes_now[n][min_tam].get_time(), temp);
+						}
+						if(temp>max_power)
+						{
+							max_power = temp;
+							min_core_new = n;
+						}
+					}
+					
+				}
+
+				if(PRINT_PARTITIONS && PRINT_PARTITION_DETAILS)
+					cout<<"Selected core with max power area:"<<min_core_new<<"\n";
+				
+				//Core with max power consumed under selected tam has been found. Assign the core to the tam
+				int temp = testtimes_now[min_core_new][min_tam].get_time();
+				update_power_info(min_core_new+1, tams_now[min_tam].get_width(),tams_now[min_tam].get_time(), tams_now[min_tam].get_time()+temp); //Update the power versus time values	
+				tams_now[min_tam].put_core(temp, min_core_new);	//Update the test time on tam
+				cores_now[min_core_new].update_assg(tams_now[min_tam]);	//Update tam assignment for core
+
+				//check_assignments(cores_now);
+			}
+			else
+			{
+				//Valid core, tam pair found. Make core assignment to tam
+
+				if(PRINT_PARTITIONS && PRINT_PARTITION_DETAILS)
+					cout<<"Selected tam:"<<min_tam<<"and core:"<<min_core<<"\n";
+				int temp = testtimes_now[min_core][min_tam].get_time();
+				update_power_info(min_core+1, tams_now[min_tam].get_width(),tams_now[min_tam].get_time(), tams_now[min_tam].get_time()+temp); //Update the power versus time values	
+				tams_now[min_tam].put_core(temp, min_core);
+				cores_now[min_core].update_assg(tams_now[min_tam]);
+					
+				
+			}
+			
+			//Printing assignments tam wise
+			for(int i=0; i<MAX_TAM_NUMBER_IP; i++)
+			{
+				int * ass_cores = tams_now[i].get_cores();
+				if(PRINT_TAM_ASSGNS)
+					printf("%d(%d):", i, tams_now[i].get_width());
+				int j = 0;
+				while(ass_cores[j]!=-1)
+				{					
+					if(PRINT_TAM_ASSGNS)
+						cout<<ass_cores[j]<<" ";
+					j++;
+				}
+				if(PRINT_TAM_ASSGNS)
+					printf("        Time : %d\n", tams_now[i].get_time());
+
+			}
+			if(PRINT_TAM_ASSGNS)
+			cout<<"\n";
+			
+			//Printing total power values vs clock cycle after this core tam assignment cycle
+			//print_power_all();
+		}
+
+		int tmax = 0;
+		for(int i=0; i<MAX_TAM_NUMBER_IP; i++)
+			{
+				int * ass_cores = tams_now[i].get_cores();
+			//	if(PRINT_TAM_ASSGNS)
+					printf("%d(%d):", i, tams_now[i].get_width());
+				int j = 0;
+				while(ass_cores[j]!=-1)
+				{					
+			//		if(PRINT_TAM_ASSGNS)
+						cout<<ass_cores[j]<<" ";
+					j++;
+				}
+			//	if(PRINT_TAM_ASSGNS)
+					printf("        Time : %d\n", tams_now[i].get_time());
+				if(tams_now[i].get_time()>tmax)
+				{
+					tmax = tams_now[i].get_time(); 
+
+				}
+
+			}
+	
+		return tmax;
 }
 int main ()
 {
@@ -834,7 +1042,7 @@ int main ()
 				}
 			}
 			
-			print_power_all(tsched_max);
+			
 			//Find the core, tam pair satisfying the condition of minimum gap between max time tam edge and that tam+core
 			int tmin = 1000000; int min_core; int min_tam;	
 			for(int n=0; n<MAX_CORES; n++)
@@ -849,7 +1057,7 @@ int main ()
 						{
 								int temp = tsched_max-tams_now[m-1].get_time()-testtimes_now[n][m-1].get_time();
 								bool pow_cond = 1;
-								//pow_cond = check_power_constraint(n+1, tams_now[m-1].get_width(),tams_now[m-1].get_time(), tams_now[m-1].get_time()+testtimes_now[n][m-1].get_time(),1);
+								pow_cond = check_power_constraint(n+1, tams_now[m-1].get_width(),tams_now[m-1].get_time(), tams_now[m-1].get_time()+testtimes_now[n][m-1].get_time(),1);
 								if(PRINT_PARTITIONS && PRINT_PARTITION_DETAILS)
 								{
 									if(!pow_cond)
@@ -857,18 +1065,13 @@ int main ()
 									else
 										cout<<temp<<" ";
 								}
-								if(temp<tmin && pow_cond && temp>0)
+								if(temp<tmin && temp>0 && pow_cond!=0)
 								{
 									tmin = temp;
 									min_core = n;
 									min_tam = m-1;
 								}
 
-								if(!pow_cond)
-								{
-									//Print cores and tams that violate the power max condition
-									//cout<<"core:"<<n<<" "<<m-1<<"\n";
-								}
 						}	
 		
 						if(PRINT_PARTITIONS && PRINT_PARTITION_DETAILS)
@@ -897,7 +1100,7 @@ int main ()
 								int temp = tams_now[m-1].get_time()+testtimes_now[n][m-1].get_time()-tsched_max;
 
 								bool pow_cond = 1;
-								//pow_cond = check_power_constraint(n+1, tams_now[m-1].get_width(),tams_now[m-1].get_time(), tams_now[m-1].get_time()+testtimes_now[n][m-1].get_time(),1);
+								pow_cond = check_power_constraint(n+1, tams_now[m-1].get_width(),tams_now[m-1].get_time(), tams_now[m-1].get_time()+testtimes_now[n][m-1].get_time(),1);
 								if(PRINT_PARTITIONS && PRINT_PARTITION_DETAILS)
 								{
 									if(!pow_cond)
@@ -905,15 +1108,10 @@ int main ()
 									else
 										cout<<temp<<" ";
 								}
-								if(temp<tmin && pow_cond)
+								if(temp<tmin && pow_cond!=0)
 								{
 									tmin = temp;
 									min_tam = m-1;
-								}
-
-								if(!pow_cond)
-								{
-									//cout<<"core:"<<n<<" "<<m-1<<"\n";
 								}
 							}
 
@@ -955,7 +1153,7 @@ int main ()
 				
 				//Core with max power consumed under selected tam has been found. Assign the core to the tam
 				int temp = testtimes_now[min_core_new][min_tam].get_time();
-				update_power_info(min_core_new+1, tams_now[min_tam].get_width(),tams_now[min_tam].get_time(), tams_now[min_tam].get_time()+temp,0); //Update the power versus time values	
+				update_power_info(min_core_new+1, tams_now[min_tam].get_width(),tams_now[min_tam].get_time(), tams_now[min_tam].get_time()+temp); //Update the power versus time values	
 				tams_now[min_tam].put_core(temp, min_core_new);	//Update the test time on tam
 				cores_now[min_core_new].update_assg(tams_now[min_tam]);	//Update tam assignment for core
 
@@ -968,17 +1166,19 @@ int main ()
 				if(PRINT_PARTITIONS && PRINT_PARTITION_DETAILS)
 					cout<<"Selected tam:"<<min_tam<<"and core:"<<min_core<<"\n";
 				int temp = testtimes_now[min_core][min_tam].get_time();
-				update_power_info(min_core+1, tams_now[min_tam].get_width(),tams_now[min_tam].get_time(), tams_now[min_tam].get_time()+temp,0); //Update the power versus time values	
+				update_power_info(min_core+1, tams_now[min_tam].get_width(),tams_now[min_tam].get_time(), tams_now[min_tam].get_time()+temp); //Update the power versus time values	
 				tams_now[min_tam].put_core(temp, min_core);
 				cores_now[min_core].update_assg(tams_now[min_tam]);
 					
 				
 			}
+			
+			//Printing assignments tam wise
 			for(int i=0; i<MAX_TAM_NUMBER_IP; i++)
 			{
 				int * ass_cores = tams_now[i].get_cores();
 				if(PRINT_TAM_ASSGNS)
-					printf("%d:", i);
+					printf("%d(%d):", i, tams_now[i].get_width());
 				int j = 0;
 				while(ass_cores[j]!=-1)
 				{					
@@ -990,10 +1190,144 @@ int main ()
 					printf("        Time : %d\n", tams_now[i].get_time());
 			}
 			cout<<"\n";
+			
+			//Printing total power values vs clock cycle after this core tam assignment cycle
+			//print_power_all();
 		}
 		exit(0);
 
 	}
+	else
+	{
+	int lc = 3;
+	int tbest = 100000000;
+	core cores_best[MAX_CORES];
+	tam tams_best[MAX_TAM_NUMBER];
+	times testtimes_best[MAX_CORES][MAX_TAM_NUMBER];
+	int lcf;
+	while(lc!=MAX_TAM_NUMBER_IP+1)
+	{
+		
+		for(int i=1;i<=lc-2;i++)
+		{
+			parts[i] = 1;
+		}
+		parts[lc-1] = 0;
+		flag = 0;
+		while(flag != 1)
+		{
+			increment(lc,lc-1,MAX_TAM_WIDTH);
+			core cores_now[MAX_CORES];
+				
+				tam tams_now[lc];
+				times testtimes_now[MAX_CORES][MAX_TAM_NUMBER];
+				for(int i=1;i<=lc;i++)
+				{
+					//printf("%d ",parts[i]);
+					//tams_now[i-1] = tams[parts[i]-1];
+					tams_now[i-1].store_tam(i-1, parts[i]);	
+					
+				}
+
+				for(int i=0; i<MAX_CORES;i++)
+				{
+					cores_now[i].store_id(i);
+				}
+
+				/** Printing stuff **/
+				for(int i=0;i<lc;i++)
+				{
+
+					if(PRINT_PARTITIONS)
+					{
+						cout<<"         "<<tams_now[i].get_width();
+					}
+					//tams_now[i] = tams[parts[i]-1];	
+					
+				}
+				if(PRINT_PARTITIONS)
+				{
+					cout << "\n";	
+				}
+				for(int n=0; n<MAX_CORES; n++)
+				{
+					if(PRINT_PARTITIONS && PRINT_PARTITION_DETAILS)
+					{
+						cout<<"Core "<<n<<" ";
+					}
+					for(int m=1; m<=lc;m++)
+					{
+						testtimes_now[n][m-1] = testtimes[n][parts[m]-1];
+
+						if(PRINT_PARTITIONS && PRINT_PARTITION_DETAILS)
+						{
+							cout<<testtimes_now[n][m-1].get_time()<<" ";
+						}
+					}
+
+					if(PRINT_PARTITIONS && PRINT_PARTITION_DETAILS)
+					{
+						cout<<"\n";
+					}
+				}
+				//Clearing the array containing power consumed
+				for(int i=0; i<MAX_NO_OF_INTERVAL; i++)
+				{
+					core_time_power_info.power_instant[i] = 0;   
+				}	
+				core_time_power_info.no_of_instants = 0;     
+
+				int time_now = power_assign(cores_now, tams_now, testtimes_now, lc);
+				if(time_now <= tbest)
+				{
+					tbest = time_now;
+					for(int i=1;i<=lc;i++)
+					{
+						//printf("%d ",parts[i]);
+						//tams_now[i-1] = tams[parts[i]-1];
+						tams_best[i-1]=tams_now[i-1];	
+						
+					}
+
+					for(int i=0; i<MAX_CORES;i++)
+					{
+						cores_best[i]=cores_now[i];
+					}
+					for(int n=0; n<MAX_CORES; n++)
+					{
+						for(int m=1; m<=lc;m++)
+						{
+							testtimes_best[n][m-1] = testtimes_now[n][m-1] ;
+						}
+					}
+					lcf= lc;	
+				}
+	
+
+				if(PRINT_COREASSG || PRINT_PARTITIONS)
+				{
+					cout<<"\n-----------------------------------------------------------------\n";
+				}
+		}
+		lc++;
+
+	} //end of while
+
+	printf("Lowest test time Final core assignment for %d :\nCore Tam TestingTime\n", tbest);
+	for(int i=0; i<MAX_CORES;i++)
+	{
+		tam t = cores_best[i].get_core_tam();
+		//printf("%d     %d       %d\n",i,t.get_tam_id(),testtimes_best[i][t.get_tam_id()].get_time());
+		printf("%d->%d ",i,t.get_tam_id());
+
+	}
+	printf("Final total testing time on tams:\nTam Width   Time\n");
+	for(int i=0; i<lcf;i++)
+	{
+		printf("%d   %d   %d \n",i,tams_best[i].get_width(),tams_best[i].get_time());//,testtimes[i][t.get_tam_id()].get_time());
+	}
+
+	}  // end of else
 	
     return 0;
 
