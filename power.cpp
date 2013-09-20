@@ -1019,14 +1019,11 @@ int main ()
 		cout<<"-------------------------------------------------------------------\n";
 		//End of printing parition scheme
 		
-		WIDTH = MAX_TAM_NUMBER_IP;   //The limit to which testtimes_now array exists
 
-		 PRINT_PARTITION_DETAILS= 1;
-		 PRINT_PARTITIONS = 1;
-		int PRINT_POWER_DETAIL = 1;
-		int PRINT_TAM_ASSGNS = 1;
-
-		int tsched_max = 0;//int tmax;
+		int time_now = power_assign(cores_now, tams_now, testtimes_now, lc);
+	/*
+	 * To be removed later 
+	 * 	int tsched_max = 0;//int tmax;
 		while(!check_all_cores_assgn(cores_now))
 		{	
 			//tams_now[1].update_time(100);
@@ -1193,7 +1190,7 @@ int main ()
 			
 			//Printing total power values vs clock cycle after this core tam assignment cycle
 			//print_power_all();
-		}
+		}*/
 		exit(0);
 
 	}
